@@ -159,3 +159,274 @@
         .next-number {
             text-align: center;
             font-size: 20px;
+            color: #667eea;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .history {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .history.show {
+            display: block;
+        }
+
+        .history h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .history-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 舒尔特方格训练</h1>
+
+        <div class="settings">
+            <label for="gridSize">方格大小：</label>
+            <select id="gridSize" onchange="updateGridSize()">
+                <option value="3">3×3 (1-9)</option>
+                <option value="4">4×4 (1-16)</option>
+                <option value="5" selected>5×5 (1-25)</option>
+                <option value="6">6×6 (1-36)</option>
+            </select>
+        </div>
+
+        <div class="timer" id="timer">00:00.00</div>
+
+        <div class="next-number" id="nextNumber">点击开始训练</div>
+
+        <div class="grid" id="grid"></div>
+
+        <div class="buttons">
+            <button class="start-btn" id="startBtn" onclick="startGame()">开始训练</button>
+            <button class="reset-btn" id="resetBtn" onclick="resetGame()">重置</button>
+        </div>
+
+        <div class="result" id="result">
+            <h2>🎉 完成！</h2>
+            <p>用时：<span id="finalTime"></span></p>
+            <p>平均每个数字：<span id="avgTime"></span> 秒</p>
+        </div>
+
+        <div class="history" id="history">
+            <h3>📊 历史记录</h3>
+            <div class="history-list" id="historyList"></div>
+        </div>
+    </div>
+
+    <script>
+        var currentNumber = 1;
+        var isRunning = false;
+        var startTime = 0;
+        var timerInterval = null;
+        var hasStarted = false;
+        var historyData = [];
+
+        var grid = document.getElementById('grid');
+        var timerDisplay = document.getElementById('timer');
+        var nextNumberDisplay = document.getElementById('nextNumber');
+        var startBtn = document.getElementById('startBtn');
+        var resultDiv = document.getElementById('result');
+        var historyDiv = document.getElementById('history');
+        var historyList = document.getElementById('historyList');
+        var gridSizeSelect = document.getElementById('gridSize');
+
+        function formatTime(ms) {
+            var minutes = Math.floor(ms / 60000);
+            var seconds = Math.floor((ms % 60000) / 1000);
+            var centiseconds = Math.floor((ms % 1000) / 10);
+
+            var minStr = minutes < 10 ? '0' + minutes : '' + minutes;
+            var secStr = seconds < 10 ? '0' + seconds : '' + seconds;
+            var msStr = centiseconds < 10 ? '0' + centiseconds : '' + centiseconds;
+
+            return minStr + ':' + secStr + '.' + msStr;
+        }
+
+        function generateGrid(size) {
+            grid.innerHTML = '';
+            grid.style.gridTemplateColumns = 'repeat(' + size + ', 1fr)';
+
+            var totalNumbers = size * size;
+            var numbers = [];
+            for (var i = 0; i < totalNumbers; i++) {
+                numbers[i] = i + 1;
+            }
+
+            // Fisher-Yates 洗牌算法
+            for (var i = numbers.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var temp = numbers[i];
+                numbers[i] = numbers[j];
+                numbers[j] = temp;
+            }
+
+            for (var i = 0; i < numbers.length; i++) {
+                var num = numbers[i];
+                var cell = document.createElement('button');
+                cell.className = 'cell';
+                cell.textContent = '' + num;
+                cell.onclick = createClickHandler(num, cell);
+                grid.appendChild(cell);
+            }
+        }
+
+        function createClickHandler(number, cell) {
+            return function() {
+                handleClick(number, cell);
+            };
+        }
+
+        function updateGridSize() {
+            if (!isRunning && !hasStarted) {
+                var size = parseInt(gridSizeSelect.value);
+                generateGrid(size);
+                nextNumberDisplay.textContent = '点击开始训练';
+            }
+        }
+
+        function handleClick(number, cell) {
+            if (!hasStarted) return;
+
+            if (!isRunning && number === 1) {
+                isRunning = true;
+                startTime = new Date().getTime();
+                timerInterval = setInterval(updateTimer, 10);
+                startBtn.textContent = '训练中...';
+            }
+
+            if (!isRunning) return;
+
+            if (number === currentNumber) {
+                cell.className = 'cell correct';
+                currentNumber++;
+
+                var size = parseInt(gridSizeSelect.value);
+                if (currentNumber > size * size) {
+                    endGame();
+                } else {
+                    nextNumberDisplay.textContent = '下一个：' + currentNumber;
+                }
+            } else {
+                cell.className = 'cell wrong';
+                setTimeout(function() {
+                    cell.className = 'cell';
+                }, 300);
+            }
+        }
+
+        function startGame() {
+            var size = parseInt(gridSizeSelect.value);
+            currentNumber = 1;
+            hasStarted = true;
+            isRunning = false;
+            startTime = 0;
+
+            generateGrid(size);
+            nextNumberDisplay.textContent = '请点击数字 1 开始';
+
+            startBtn.disabled = true;
+            startBtn.textContent = '等待开始...';
+            resultDiv.className = 'result';
+            historyDiv.className = 'history';
+
+            timerDisplay.textContent = '00:00.00';
+        }
+
+        function updateTimer() {
+            if (startTime === 0) {
+                timerDisplay.textContent = '00:00.00';
+                return;
+            }
+
+            var elapsed = new Date().getTime() - startTime;
+            timerDisplay.textContent = formatTime(elapsed);
+        }
+
+        function endGame() {
+            isRunning = false;
+            clearInterval(timerInterval);
+
+            var finalTime = new Date().getTime() - startTime;
+            var size = parseInt(gridSizeSelect.value);
+            var totalNumbers = size * size;
+            var avgTime = (finalTime / totalNumbers / 1000).toFixed(2);
+
+            var timeStr = formatTime(finalTime);
+
+            document.getElementById('finalTime').textContent = timeStr;
+            document.getElementById('avgTime').textContent = avgTime;
+
+            resultDiv.className = 'result show';
+            nextNumberDisplay.textContent = '完成！';
+            startBtn.disabled = false;
+            startBtn.textContent = '再次训练';
+
+            historyData.unshift({
+                size: size + '×' + size,
+                time: timeStr,
+                avg: avgTime,
+                date: new Date().toLocaleTimeString()
+            });
+
+            updateHistoryDisplay();
+        }
+
+        function resetGame() {
+            isRunning = false;
+            hasStarted = false;
+            clearInterval(timerInterval);
+
+            currentNumber = 1;
+            timerDisplay.textContent = '00:00.00';
+            nextNumberDisplay.textContent = '点击开始训练';
+            startBtn.disabled = false;
+            startBtn.textContent = '开始训练';
+
+            var size = parseInt(gridSizeSelect.value);
+            generateGrid(size);
+
+            resultDiv.className = 'result';
+            historyDiv.className = 'history';
+        }
+
+        function updateHistoryDisplay() {
+            if (historyData.length === 0) return;
+
+            historyDiv.className = 'history show';
+            historyList.innerHTML = '';
+
+            for (var i = 0; i < historyData.length; i++) {
+                var record = historyData[i];
+                var item = document.createElement('div');
+                item.className = 'history-item';
+                item.innerHTML = '<span>#' + (i + 1) + ' ' + record.size + ' - ' + record.date + '</span>' +
+                    '<span>' + record.time + ' (' + record.avg + 's/个)</span>';
+                historyList.appendChild(item);
+            }
+        }
+
+        // 初始化
+        generateGrid(5);
+    </script>
+</body>
+</html>
